@@ -1,0 +1,162 @@
+---
+title: "boletin_cuentas_departamentales"
+output: html_document
+date: "2023-12-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Cuentas departamentales 2022 preliminar
+
+Las cuentas departamentales se construyen de manera coherente con los agregados macroeconómicos nacionales, a través del uso de indicadores estadísticos asociados a las
+Actividades productivas de cada departamento del país. A partir de ello, se genera una asignación Departamental y regional del Producto Interno Bruto (PIB) nacional
+
+## Paquetes instalados:
+
+```{r}
+#install.packages("xlsx")
+#install.packages("ggplot2")
+#install.packages("dplyr")
+#install.packages("tidyr")
+#install.packages("plm")
+```
+
+## Librerias cargadas:
+
+```{r}
+library(openxlsx)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(plm)
+library(stringr)
+library(dplyr)
+```
+
+## Importacion de base de datos:
+
+```{r}
+base_de_datos <- read_excel("C:/Users/juan2/Downloads/base de datos.xlsx")
+summary(base_de_datos)
+attach(base_de_datos)
+```
+
+Variables:
+
+```{r}
+# Ver que columnas hay:
+print(names(base_de_datos))
+# Re nombrar cols:
+colnames(base_de_datos)=c("codigo_dep","departamentos","year2005",
+                  "year2006","year2007","year2008","year2009","year2010",
+                  "year2011","year2012","year2013","year2014","year2015",
+                  "year2016","year2017","year2018","year2019","year2020p",
+                  "year2021p","year2022pr")
+attach(base_de_datos)
+```
+
+## Registro unico de paises, elimina los duplicados
+
+```{r}
+#summary(base_de_datos)
+unique(base_de_datos$departamentos) ###nombre de paises unicos
+```
+
+Se obtuvieron 33 departamentos de Colombia, incluyendo tambien a Bogota.
+
+## TRATAR NA
+
+```{r}
+## contar na:
+colSums(is.na(base_de_datos))
+
+## Se reemplazam por doble cero.
+base_de_datos$codigo_dep[is.na(base_de_datos$codigo_dep)] <- "00"
+print(base_de_datos$codigo_dep)
+colSums(is.na(base_de_datos))
+```
+
+## Se adiciona el indices:
+
+```{r}
+# Creamos el nuevo objeto y el índice:
+base_de_datos<-pdata.frame(base_de_datos, index = c("codigo_dep", "departamentos"))
+head(base_de_datos)
+```
+
+## Histograma de Producto interno bruto 2021 VS 2022:
+
+```{r}
+hist(year2022pr, main = "Histograma de Producto interno bruto 2021 VS 2022",
+     ylab = "Frecuencia de departamentos", xlab = "PIB",
+     col = "ivory")
+# base_de_datos[,-1] quitar una columna
+boxplot(base_de_datos$year2022pr)
+```
+
+# Resultados a precios corrientes:
+
+Para 2022pr, el PIB nacional es 1.462.522 miles de millones de pesos, a precios corrientes. Los departamentos con mayor PIB son Bogotá D. C. y Antioquia con 357.259 y 212.515 miles de millones de pesos, respectivamente.
+Por su parte, los departamentos con menor PIB son Guainía y Vaupés con 498 y 382 miles de millones de pesos, respectivamente.
+
+Se deja solo el departamento y el ultimo year:
+
+```{r}
+datos2 <- select(base_de_datos, -codigo_dep, -year2005, -year2006,
+                 -year2007, -year2008, -year2009, -year2010, -year2011, 
+                 -year2012, -year2013, -year2014, -year2015,-year2016,
+                 -year2017, -year2018, -year2019, -year2020p, -year2021p) # Forma simple 
+colnames(datos2)=c("DEPARTAMENTO","a2022pr")
+```
+
+Se ordena del mayor al menor pib:
+
+```{r}
+datos2 <- datos2[with(datos2, order(-datos2$a2022pr)), ] # Orden directo 
+head(datos2)
+attach(datos2)
+```
+
+Se adiciona una columna con las proporciones y se redondea a 5 digitos:
+
+```{r}
+proporcion= round((datos2$a2022pr)/(1462522.44),digits=5)
+head(proporcion)
+# Aplicar la transformación a todas las columnas del dataframe
+datos3<-cbind(datos2,proporcion)
+head(datos3)
+```
+
+Se coloca en mayuscula la primera letra de cada departamento:
+
+```{r}
+# Poner solo la primera letra de cada departamento en mayuscula
+datos3 <- datos3 %>%
+  mutate_all(~str_to_title(.))
+# Imprimir el resultado
+head(datos3)
+str(datos3)
+```
+
+Se pasan a numerico las columnas de PIB y proporcion, ademas, se redondea a 3 cifras el PIB:
+
+```{r}
+#x<-round(a2022pr, digits = 3)
+datos3$a2022pr <- as.numeric(datos3$a2022pr)
+datos3$proporcion <- as.numeric(datos3$proporcion)
+
+datos3 <- datos3 %>%
+  mutate(a2022pr = round(a2022pr, digits = 3))
+head(datos3)
+```
+Exportacion de Data frame excel:
+
+```{r}
+# Guardar el dataframe como un archivo Excel
+
+write.xlsx(datos3, "C:/Users/juan2/Downloads/prueba/archivo.xlsx")
+
+```
